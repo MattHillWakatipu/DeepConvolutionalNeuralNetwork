@@ -18,11 +18,14 @@ import numpy as np
 import tensorflow as tf
 import random
 
+from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten
+
+from test import load_images, convert_img_to_array, preprocess_data
+
 # Set random seeds to ensure the reproducible results
 SEED = 309
 np.random.seed(SEED)
 random.seed(SEED)
-#tf.set_random_seed(SEED)
 tf.random.set_seed(SEED)
 
 
@@ -39,12 +42,55 @@ def construct_model():
     :return: model: the initial CNN model
     """
     model = Sequential()
-    model.add(Dense(units=64, activation='relu', input_dim=100))
-    model.add(Dense(units=10, activation='softmax'))
+
+    # 3 Convolutional layers with ReLU activation followed by max-pooling
+    model.add(Conv2D(32, (3, 3), input_shape=(128, 128, 3), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Conv2D(32, (3, 3), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Conv2D(64, (3, 3), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Flatten())
+    model.add(Dense(64))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(3))
+    model.add(Activation('sigmoid'))
+
     model.compile(loss='categorical_crossentropy',
-              optimizer='sgd',
-              metrics=['accuracy'])
+                  optimizer='sgd',
+                  metrics=['categorical_accuracy'])
+
+    print(model.summary())
+
     return model
+
+
+def load_training_data():
+    # Test folder
+    train_data_dir = "data/train"
+
+    # Image size, please define according to your settings when training your model.
+    image_size = (128, 128)
+
+    # Load images
+    images, labels = load_images(train_data_dir, image_size)
+
+    # Convert images to numpy arrays (images are normalized with constant 255.0), and binarize categorical labels
+    x_train, y_train = convert_img_to_array(images, labels)
+
+    # Preprocess data.
+    x_train = preprocess_data(x_train)
+
+    # Exploratory Data Analysis
+    print("Training data loaded")
+    print("Instances: {}".format(x_train.shape[0]))
+    print("Size: {} x {} x {}".format(x_train.shape[1], x_train.shape[2], x_train.shape[3]))
+
+    return x_train, y_train
 
 
 def train_model(model):
@@ -56,7 +102,14 @@ def train_model(model):
     :param model: the initial CNN model
     :return:model:   the trained CNN model
     """
-    # Add your code here
+    x_train, y_train = load_training_data()
+    # TODO validation_split=0.1
+    model.fit(x_train, y_train,
+              batch_size=256,
+              epochs=50,
+              verbose=1)
+    loss_and_metrics = model.evaluate(x_train, y_train, verbose=0)
+    print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
     return model
 
 
@@ -66,11 +119,7 @@ def save_model(model):
     :param model: the trained CNN model
     :return:
     """
-    # ***
-    #   Please remove the comment to enable model save.
-    #   However, it will overwrite the baseline model we provided.
-    # ***
-    #model.save("model/model.h5")
+    model.save("model/model.h5")
     print("Model Saved Successfully.")
 
 

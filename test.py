@@ -9,8 +9,6 @@ The test.py is to evaluate your model on the test images.
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import img_to_array, ImageDataGenerator
 
-# You need to install "imutils" lib by the following command:
-#               pip install imutils
 from imutils import paths
 from sklearn.preprocessing import LabelBinarizer
 import cv2
@@ -25,9 +23,10 @@ import tensorflow as tf
 SEED = 309
 np.random.seed(SEED)
 random.seed(SEED)
-#tf.set_random_seed(SEED)
+# tf.set_random_seed(SEED)
 tf.random.set_seed(SEED)
 print(tf.version.VERSION)
+
 
 def parse_args():
     """
@@ -36,13 +35,13 @@ def parse_args():
     """
     # Parse the arguments, please do not change
     args = argparse.ArgumentParser()
-    args.add_argument("--test_data_dir", default = "data/test",
-                      help = "path to test_data_dir")
+    args.add_argument("--test_data_dir", default="data/test",
+                      help="path to test_data_dir")
     args = vars(args.parse_args())
     return args
 
 
-def load_images(test_data_dir, image_size = (300, 300)):
+def load_images(test_data_dir, image_size=(300, 300)):
     """
     Load images from local directory
     :return: the image list (encoded as an array)
@@ -67,14 +66,14 @@ def load_images(test_data_dir, image_size = (300, 300)):
 
 def convert_img_to_array(images, labels):
     # Convert to numpy and do constant normalize
-    X_test = np.array(images, dtype = "float") / 255.0
+    x_test = np.array(images, dtype="float") / 255.0
     y_test = np.array(labels)
 
     # Binarize the labels
     lb = LabelBinarizer()
     y_test = lb.fit_transform(y_test)
 
-    return X_test, y_test
+    return x_test, y_test
 
 
 def preprocess_data(X):
@@ -88,11 +87,11 @@ def preprocess_data(X):
     return X
 
 
-def evaluate(X_test, y_test):
+def evaluate(x_test, y_test):
     """
     Evaluation on test images
     ******Please do not change this function******
-    :param X_test: test images
+    :param x_test: test images
     :param y_test: test labels
     :return: the accuracy
     """
@@ -102,7 +101,7 @@ def evaluate(X_test, y_test):
     # Load Model
     model = load_model('model/model.h5')
     print(model.summary())
-    return model.evaluate(X_test, y_test, batch_size, verbose = 1)
+    return model.evaluate(x_test, y_test, batch_size, verbose=1)
 
 
 if __name__ == '__main__':
@@ -113,18 +112,19 @@ if __name__ == '__main__':
     test_data_dir = args["test_data_dir"]
 
     # Image size, please define according to your settings when training your model.
-    image_size = (64, 64)
+    image_size = (300, 300)
 
     # Load images
     images, labels = load_images(test_data_dir, image_size)
 
     # Convert images to numpy arrays (images are normalized with constant 255.0), and binarize categorical labels
-    X_test, y_test = convert_img_to_array(images, labels)
+    x_test, y_test = convert_img_to_array(images, labels)
 
     # Preprocess data.
     # ***If you have any preprocess, please re-implement the function "preprocess_data"; otherwise, you can skip this***
-    X_test = preprocess_data(X_test)
-    #print(X_test.shape)
+    x_test = preprocess_data(x_test)
+    # print(x_test.shape)
+
     # Evaluation, please make sure that your training model uses "accuracy" as metrics, i.e., metrics=['accuracy']
-    loss, accuracy = evaluate(X_test, y_test)
+    loss, accuracy = evaluate(x_test, y_test)
     print("loss={}, accuracy={}".format(loss, accuracy))

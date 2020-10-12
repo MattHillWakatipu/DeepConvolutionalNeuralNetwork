@@ -23,7 +23,6 @@ import random
 SEED = 309
 np.random.seed(SEED)
 random.seed(SEED)
-#tf.set_random_seed(SEED)
 tf.random.set_seed(SEED)
 
 
@@ -50,8 +49,8 @@ def construct_model():
     model.add(Dense(units=64, activation='relu'))
     model.add(Dense(units=3, activation='softmax'))
     model.compile(loss='categorical_crossentropy',
-              optimizer='sgd',
-              metrics=['accuracy'])
+                  optimizer='sgd',
+                  metrics=['accuracy'])
     return model
 
 
@@ -78,7 +77,7 @@ def save_model(model):
     #   Please remove the comment to enable model save.
     #   However, it will overwrite the baseline model we provided.
     # ***
-    model.save("model/model.h5")
+    # model.save("model/model.h5")
     print("Model Saved Successfully.")
 
 
