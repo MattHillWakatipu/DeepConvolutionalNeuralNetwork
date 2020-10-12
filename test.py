@@ -23,7 +23,6 @@ import tensorflow as tf
 SEED = 309
 np.random.seed(SEED)
 random.seed(SEED)
-# tf.set_random_seed(SEED)
 tf.random.set_seed(SEED)
 print(tf.version.VERSION)
 
@@ -62,6 +61,15 @@ def load_images(test_data_dir, image_size=(300, 300)):
         label = imagePath.split(os.path.sep)[-2]
         labels.append(label)
     return images_data, sorted(labels)
+
+
+def unison_shuffle(x, y):
+    # FIXME check that this is shuffling in unison
+    rng_state = np.random.get_state()
+    np.random.shuffle(x)
+    np.random.set_state(rng_state)
+    np.random.shuffle(y)
+    return x, y
 
 
 def convert_img_to_array(images, labels):
@@ -112,7 +120,7 @@ if __name__ == '__main__':
     test_data_dir = args["test_data_dir"]
 
     # Image size, please define according to your settings when training your model.
-    image_size = (300, 300)
+    image_size = (64, 64)
 
     # Load images
     images, labels = load_images(test_data_dir, image_size)

@@ -20,7 +20,7 @@ import random
 
 from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten
 
-from test import load_images, convert_img_to_array, preprocess_data
+from test import load_images, convert_img_to_array, preprocess_data, unison_shuffle
 
 # Set random seeds to ensure the reproducible results
 SEED = 309
@@ -44,7 +44,7 @@ def construct_model():
     model = Sequential()
 
     # 3 Convolutional layers with ReLU activation followed by max-pooling
-    model.add(Conv2D(32, (3, 3), input_shape=(128, 128, 3), activation='relu'))
+    model.add(Conv2D(32, (3, 3), input_shape=(300, 300, 3), activation='relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
 
     model.add(Conv2D(32, (3, 3), activation='relu'))
@@ -71,13 +71,16 @@ def construct_model():
 
 def load_training_data():
     # Test folder
-    train_data_dir = "data/train"
+    train_data_dir = "data/smalltrain"
 
     # Image size, please define according to your settings when training your model.
-    image_size = (128, 128)
+    image_size = (300, 300)
 
     # Load images
     images, labels = load_images(train_data_dir, image_size)
+
+    # Shuffle in unison to prevent valuation set being comprised of a single class
+    # images, labels = unison_shuffle(images, labels)
 
     # Convert images to numpy arrays (images are normalized with constant 255.0), and binarize categorical labels
     x_train, y_train = convert_img_to_array(images, labels)
@@ -89,6 +92,7 @@ def load_training_data():
     print("Training data loaded")
     print("Instances: {}".format(x_train.shape[0]))
     print("Size: {} x {} x {}".format(x_train.shape[1], x_train.shape[2], x_train.shape[3]))
+    print(y_train[-20:])
 
     return x_train, y_train
 
@@ -103,10 +107,10 @@ def train_model(model):
     :return:model:   the trained CNN model
     """
     x_train, y_train = load_training_data()
-    # TODO validation_split=0.1
     model.fit(x_train, y_train,
-              batch_size=256,
+              batch_size=10,
               epochs=50,
+              # validation_split=0.1,
               verbose=1)
     loss_and_metrics = model.evaluate(x_train, y_train, verbose=0)
     print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
