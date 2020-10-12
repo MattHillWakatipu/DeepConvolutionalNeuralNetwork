@@ -6,10 +6,16 @@ This is just a simple template, you feel free to change it according to your own
 However, you must make sure:
 1. Your own model is saved to the directory "model" and named as "model.h5"
 2. The "test.py" must work properly with your model, this will be used by tutors for marking.
-3. If you have added any extra pre-processing steps, please make sure you also implement them in "test.py" so that they can later be applied to test images.
+3. If you have added any extra pre-processing steps, please make sure you also implement them in "test.py"
+    so that they can later be applied to test images.
 
 ©2018 Created by Yiming Peng and Bing Xue
 """
+import glob
+import os
+import shutil
+
+from keras_preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras import backend as K
@@ -20,7 +26,7 @@ import random
 
 from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten
 
-from test import load_images, convert_img_to_array, preprocess_data, unison_shuffle
+from test import load_images, convert_img_to_array, preprocess_data
 
 # Set random seeds to ensure the reproducible results
 SEED = 309
@@ -43,7 +49,7 @@ def construct_model():
     """
     model = Sequential()
 
-    # 3 Convolutional layers with ReLU activation followed by max-pooling
+    # 3 x Convolutional layers with ReLU activation followed by max-pooling
     model.add(Conv2D(32, (3, 3), input_shape=(300, 300, 3), activation='relu'))
     model.add(MaxPooling2D(pool_size=(2, 2)))
 
@@ -69,32 +75,44 @@ def construct_model():
     return model
 
 
-def load_training_data():
-    # Test folder
-    train_data_dir = "data/smalltrain"
+def create_data_generators():
+    generator = ImageDataGenerator(preprocessing_function=tf.keras.applications.vgg16.preprocess_input)
+    train_datagen = ImageDataGenerator(
+        rescale=1. / 255,
+        shear_range=0.2,
+        zoom_range=0.2,
+        horizontal_flip=True)
+    test_datagen = ImageDataGenerator(rescale=1. / 255)
 
-    # Image size, please define according to your settings when training your model.
     image_size = (300, 300)
+    class_tuple = ['cherry', 'strawberry', 'tomato']
 
-    # Load images
-    images, labels = load_images(train_data_dir, image_size)
+    train_generator = train_datagen.flow_from_directory(
+        directory='data/train',
+        target_size=image_size,
+        classes=class_tuple,)
 
-    # Shuffle in unison to prevent valuation set being comprised of a single class
-    # images, labels = unison_shuffle(images, labels)
+    validation_generator = test_datagen.flow_from_directory(
+        directory='data/validation',
+        target_size=image_size,
+        classes=class_tuple,)
 
-    # Convert images to numpy arrays (images are normalized with constant 255.0), and binarize categorical labels
-    x_train, y_train = convert_img_to_array(images, labels)
+    test_generator = generator.flow_from_directory(
+        directory='data/test',
+        target_size=image_size,
+        classes=class_tuple,
+        shuffle=False)
 
-    # Preprocess data.
-    x_train = preprocess_data(x_train)
+    print(train_generator.n)
+    print(validation_generator.n)
+    print(test_generator.n)
 
-    # Exploratory Data Analysis
-    print("Training data loaded")
-    print("Instances: {}".format(x_train.shape[0]))
-    print("Size: {} x {} x {}".format(x_train.shape[1], x_train.shape[2], x_train.shape[3]))
-    print(y_train[-20:])
+    assert train_generator.n == 1000
+    assert validation_generator.n == 200
+    assert test_generator.n == 100
+    assert train_generator.num_classes == validation_generator.num_classes == test_generator.num_classes == 3
 
-    return x_train, y_train
+    return train_generator, validation_generator, test_generator
 
 
 def train_model(model):
@@ -106,14 +124,16 @@ def train_model(model):
     :param model: the initial CNN model
     :return:model:   the trained CNN model
     """
-    x_train, y_train = load_training_data()
-    model.fit(x_train, y_train,
-              batch_size=10,
+    train_generator, validation_generator, test_generator = create_data_generators()
+    model.fit(train_generator,
+              steps_per_epoch=2000,
               epochs=50,
-              # validation_split=0.1,
+              validation_data=validation_generator,
+              validation_steps=800,
               verbose=1)
-    loss_and_metrics = model.evaluate(x_train, y_train, verbose=0)
-    print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
+
+    # loss_and_metrics = model.evaluate(x_train, y_train, verbose=0)
+    # print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
     return model
 
 
@@ -127,7 +147,49 @@ def save_model(model):
     print("Model Saved Successfully.")
 
 
+def split_data():
+    """
+    Split the data into training, validation, and testing sets.
+    :return:
+    """
+    os.chdir('data')
+    if os.path.isdir('train/cherry') is False:
+        os.makedirs('train/cherry')
+        os.makedirs('train/strawberry')
+        os.makedirs('train/tomato')
+
+        os.makedirs('validation/cherry')
+        os.makedirs('validation/strawberry')
+        os.makedirs('validation/tomato')
+
+        os.makedirs('test/cherry')
+        os.makedirs('test/strawberry')
+        os.makedirs('test/tomato')
+
+        for c in random.sample(glob.glob('cherry*'), 500):
+            shutil.move(c, 'train/cherry')
+        for c in random.sample(glob.glob('strawberry*'), 500):
+            shutil.move(c, 'train/strawberry')
+        for c in random.sample(glob.glob('tomato*'), 500):
+            shutil.move(c, 'train/tomato')
+
+        for c in random.sample(glob.glob('cherry*'), 100):
+            shutil.move(c, 'validation/cherry')
+        for c in random.sample(glob.glob('strawberry*'), 100):
+            shutil.move(c, 'validation/strawberry')
+        for c in random.sample(glob.glob('tomato*'), 100):
+            shutil.move(c, 'validation/tomato')
+
+        for c in random.sample(glob.glob('cherry*'), 50):
+            shutil.move(c, 'test/cherry')
+        for c in random.sample(glob.glob('strawberry*'), 50):
+            shutil.move(c, 'test/strawberry')
+        for c in random.sample(glob.glob('tomato*'), 50):
+            shutil.move(c, 'test/tomato')
+
+
 if __name__ == '__main__':
+    split_data()
     model = construct_model()
     model = train_model(model)
     save_model(model)
