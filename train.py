@@ -119,15 +119,15 @@ def create_data_generators():
         batch_size=10,
         shuffle=False)
 
-    assert train_generator.n == 150
-    assert validation_generator.n == 30
-    assert test_generator.n == 15
+    assert train_generator.n == 3600
+    assert validation_generator.n == 450
+    assert test_generator.n == 450
     assert train_generator.num_classes == validation_generator.num_classes == test_generator.num_classes == 3
 
     return train_generator, validation_generator, test_generator
 
 
-def train_model(model, train_generator, validation_generator):
+def train_model(model, train_generator, validation_generator,):
     """
     Train the CNN model
     ***
@@ -137,14 +137,14 @@ def train_model(model, train_generator, validation_generator):
     :return:model:   the trained CNN model
     """
     model.fit(train_generator,
-              steps_per_epoch=15,
-              epochs=50,
+              steps_per_epoch=360,
+              epochs=5,
               validation_data=validation_generator,
-              validation_steps=3,
+              validation_steps=45,
               verbose=1)
 
-    # loss_and_metrics = model.evaluate(x_train, y_train, verbose=0)
-    # print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
+    loss_and_metrics = model.evaluate(test_generator, verbose=0)
+    print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
     return model
 
 
@@ -180,25 +180,25 @@ def split_data():
         os.makedirs('test/strawberry')
         os.makedirs('test/tomato')
 
-        for c in random.sample(glob.glob('cherry*'), 50):
+        for c in random.sample(glob.glob('cherry*'), 1200):
             shutil.move(c, 'train/cherry')
-        for c in random.sample(glob.glob('strawberry*'), 50):
+        for c in random.sample(glob.glob('strawberry*'), 1200):
             shutil.move(c, 'train/strawberry')
-        for c in random.sample(glob.glob('tomato*'), 50):
+        for c in random.sample(glob.glob('tomato*'), 1200):
             shutil.move(c, 'train/tomato')
 
-        for c in random.sample(glob.glob('cherry*'), 10):
+        for c in random.sample(glob.glob('cherry*'), 150):
             shutil.move(c, 'validation/cherry')
-        for c in random.sample(glob.glob('strawberry*'), 10):
+        for c in random.sample(glob.glob('strawberry*'), 150):
             shutil.move(c, 'validation/strawberry')
-        for c in random.sample(glob.glob('tomato*'), 10):
+        for c in random.sample(glob.glob('tomato*'), 150):
             shutil.move(c, 'validation/tomato')
 
-        for c in random.sample(glob.glob('cherry*'), 5):
+        for c in random.sample(glob.glob('cherry*'), 150):
             shutil.move(c, 'test/cherry')
-        for c in random.sample(glob.glob('strawberry*'), 5):
+        for c in random.sample(glob.glob('strawberry*'), 150):
             shutil.move(c, 'test/strawberry')
-        for c in random.sample(glob.glob('tomato*'), 5):
+        for c in random.sample(glob.glob('tomato*'), 150):
             shutil.move(c, 'test/tomato')
 
 
@@ -213,13 +213,17 @@ def plot_images(images_arr):
 
 
 if __name__ == '__main__':
+    # Split the dataset into smaller size, may remove later
     split_data()
+
+    # Create data generators for
     train_generator, validation_generator, test_generator = create_data_generators()
 
+    # Plot the first 10 images and print their labels
     images, labels = next(train_generator)
     plot_images(images)
     print(labels)
 
     model = construct_model()
-    model = train_model(model, train_generator, validation_generator)
+    model = train_model(model, train_generator, test_generator)
     save_model(model)
