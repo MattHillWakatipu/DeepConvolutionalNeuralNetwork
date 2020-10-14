@@ -25,7 +25,9 @@ import numpy as np
 import tensorflow as tf
 import random
 
-from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten
+from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten, MaxPool2D
+from tensorflow.python.keras.optimizers import Adam
 
 from test import load_images, convert_img_to_array, preprocess_data
 
@@ -37,56 +39,6 @@ tf.random.set_seed(SEED)
 
 batch_size = 16
 image_size = (300, 300)
-
-def construct_model():
-    """
-    Construct the CNN model.
-    ***
-        Please add your model implementation here, and don't forget compile the model
-        E.g., model.compile(loss='categorical_crossentropy',
-                            optimizer='sgd',
-                            metrics=['accuracy'])
-        NOTE, You must include 'accuracy' in as one of your metrics, which will be used for marking later.
-    ***
-    :return: model: the initial CNN model
-    """
-    model = Sequential()
-
-    # 3 x Convolutional layers with ReLU activation followed by max-pooling
-    model.add(Conv2D(filters=32, kernel_size=(3, 3), input_shape=(300, 300, 3)))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-
-    model.add(Conv2D(filters=32, kernel_size=(3, 3)))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-
-    model.add(Conv2D(filters=64, kernel_size=(3, 3)))
-    model.add(Activation('relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-
-    model.add(Flatten())
-    model.add(Dense(64))
-    model.add(Activation('relu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(3))
-    model.add(Activation('sigmoid'))
-
-    # model.add(Conv2D(filters=32, kernel_size=(3, 3), input_shape=(300, 300, 3), activation='relu'))
-    # model.add(MaxPooling2D(pool_size=(2, 2)))
-    # model.add(Conv2D(filters=64, kernel_size=(3, 3), activation='relu'))
-    # model.add(MaxPooling2D(pool_size=(2, 2)))
-    # model.add(Flatten())
-    # model.add(Dense(3))
-    # model.add(Activation('softmax'))
-
-    model.compile(loss='categorical_crossentropy',
-                  optimizer='rmsprop',
-                  metrics=['accuracy'])
-
-    print(model.summary())
-
-    return model
 
 
 def create_data_generators():
@@ -129,6 +81,66 @@ def create_data_generators():
     return train_generator, validation_generator, test_generator
 
 
+def construct_model():
+    """
+    Construct the CNN model.
+    ***
+        Please add your model implementation here, and don't forget compile the model
+        E.g., model.compile(loss='categorical_crossentropy',
+                            optimizer='sgd',
+                            metrics=['accuracy'])
+        NOTE, You must include 'accuracy' in as one of your metrics, which will be used for marking later.
+    ***
+    :return: model: the initial CNN model
+    """
+    model = Sequential()
+
+    # Block 1 convolution layer
+    model.add(Conv2D(input_shape=(300, 300, 3), filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
+    # model.add(Conv2D(filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+    model.add(Conv2D(filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+    model.add(Conv2D(filters=64, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+    model.add(Flatten())
+
+    model.add(Dense(units=64, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(units=3, activation='softmax'))
+
+    # AlexNet
+    # model.add(Conv2D(input_shape=(300, 300, 3), filters=96, kernel_size=(11, 11), strides=4, activation='relu'))
+    # model.add(MaxPooling2D(pool_size=(3, 3), strides=(2, 2)))
+    #
+    # model.add(Conv2D(filters=256, kernel_size=(5, 5), padding='same', activation='relu'))
+    # model.add(MaxPooling2D(pool_size=(3, 3), strides=(2, 2)))
+    #
+    # model.add(Conv2D(filters=512, kernel_size=(3, 3), padding='same', activation='relu'))
+    # model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+    #
+    # model.add(Conv2D(filters=1024, kernel_size=(3, 3), padding='same', activation='relu'))
+    # model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+    #
+    # model.add(Flatten())
+    # model.add(Dense(units=3072, activation='relu'))
+    # model.add(Dense(units=4096, activation='relu'))
+    # model.add(Dense(units=4096, activation='relu'))
+    # model.add(Dropout(0.5))
+    # model.add(Dense(units=3, activation='softmax'))
+
+    model.summary()
+
+    model.compile(loss='categorical_crossentropy',
+                  optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                  metrics=['accuracy'])
+
+    return model
+
+
 def train_model(model, train_generator, validation_generator):
     """
     Train the CNN model
@@ -138,11 +150,14 @@ def train_model(model, train_generator, validation_generator):
     :param model: the initial CNN model
     :return:model:   the trained CNN model
     """
+    callbacks = EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=20, verbose=1)
+
     model.fit(train_generator,
               steps_per_epoch=3600 // batch_size,
-              epochs=20,
+              epochs=100,
               validation_data=validation_generator,
               validation_steps=450 // batch_size,
+              callbacks=callbacks,
               verbose=1)
 
     loss_and_metrics = model.evaluate(test_generator, verbose=0)
@@ -222,9 +237,9 @@ if __name__ == '__main__':
     train_generator, validation_generator, test_generator = create_data_generators()
 
     # Plot the first 10 images and print their labels
-    images, labels = next(train_generator)
-    plot_images(images)
-    print(labels)
+    # images, labels = next(train_generator)
+    # plot_images(images)
+    # print(labels)
 
     model = construct_model()
     model = train_model(model, train_generator, test_generator)

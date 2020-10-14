@@ -103,6 +103,20 @@ def evaluate(x_test, y_test):
     return model.evaluate(x_test, y_test, batch_size, verbose=1)
 
 
+def gen_evaluate():
+    test_datagen = ImageDataGenerator(rescale=1. / 255)
+
+    test_generator = test_datagen.flow_from_directory(
+        directory='data/test',
+        target_size=image_size,
+        classes=['cherry', 'strawberry', 'tomato'],
+        batch_size=16,
+        shuffle=False)
+
+    model = load_model('model/model.h5')
+    return model.evaluate(test_generator, verbose=0)
+
+
 if __name__ == '__main__':
     # Parse the arguments
     args = parse_args()
@@ -122,8 +136,12 @@ if __name__ == '__main__':
     # Preprocess data.
     # ***If you have any preprocess, please re-implement the function "preprocess_data"; otherwise, you can skip this***
     x_test = preprocess_data(x_test)
-    # print(x_test.shape)
 
     # Evaluation, please make sure that your training model uses "accuracy" as metrics, i.e., metrics=['accuracy']
+    # FIXME need to pre process this somehow? Generator based testing works correctly but this does not
     loss, accuracy = evaluate(x_test, y_test)
     print("loss={}, accuracy={}".format(loss, accuracy))
+
+    # Valuation using generator
+    loss_and_metrics = gen_evaluate()
+    print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
