@@ -18,14 +18,14 @@ import shutil
 from keras_preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
-from tensorflow.keras import backend as K, applications
+from tensorflow.keras import backend as K
 
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import random
 
-from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten, MaxPool2D
+from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten
 
 from test import load_images, convert_img_to_array, preprocess_data
 
@@ -35,15 +35,8 @@ np.random.seed(SEED)
 random.seed(SEED)
 tf.random.set_seed(SEED)
 
-# Training parameters
-image_size = (300, 300)
 batch_size = 16
-epochs = 50
-
-# VGG16 parameters
-# weights_path = '../keras/examples/vgg16_weights.h5'
-# top_model_weights_path = 'fc_model.h5'
-
+image_size = (300, 300)
 
 def construct_model():
     """
@@ -57,23 +50,35 @@ def construct_model():
     ***
     :return: model: the initial CNN model
     """
-    vgg16 = tf.keras.applications.vgg16.VGG16()
-
-    vgg16.summary()
-
     model = Sequential()
-    for layer in vgg16.layers[:-4]:
-        model.add(layer)
 
-    # Set all VGG16 layers to un-trainable to freeze them in place
-    for layer in model.layers:
-        layer.trainable = False
+    # 3 x Convolutional layers with ReLU activation followed by max-pooling
+    model.add(Conv2D(filters=32, kernel_size=(3, 3), input_shape=(300, 300, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
 
-    model.summary()
+    model.add(Conv2D(filters=32, kernel_size=(3, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
 
-    # model.add(Dense(units=256, activation='relu'))
-    # model.add(Dropout(0.5))
-    model.add(Dense(units=2, activation='sigmoid'))
+    model.add(Conv2D(filters=64, kernel_size=(3, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Flatten())
+    model.add(Dense(64))
+    model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(3))
+    model.add(Activation('sigmoid'))
+
+    # model.add(Conv2D(filters=32, kernel_size=(3, 3), input_shape=(300, 300, 3), activation='relu'))
+    # model.add(MaxPooling2D(pool_size=(2, 2)))
+    # model.add(Conv2D(filters=64, kernel_size=(3, 3), activation='relu'))
+    # model.add(MaxPooling2D(pool_size=(2, 2)))
+    # model.add(Flatten())
+    # model.add(Dense(3))
+    # model.add(Activation('softmax'))
 
     model.compile(loss='categorical_crossentropy',
                   optimizer='rmsprop',
