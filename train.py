@@ -35,6 +35,8 @@ np.random.seed(SEED)
 random.seed(SEED)
 tf.random.set_seed(SEED)
 
+batch_size = 16
+image_size = (300, 300)
 
 def construct_model():
     """
@@ -88,35 +90,35 @@ def construct_model():
 
 
 def create_data_generators():
-    generator = ImageDataGenerator(preprocessing_function=tf.keras.applications.vgg16.preprocess_input)
+    # generator = ImageDataGenerator(preprocessing_function=tf.keras.applications.vgg16.preprocess_input)
 
     train_datagen = ImageDataGenerator(
         rescale=1. / 255,
         shear_range=0.2,
         zoom_range=0.2,
         horizontal_flip=True)
+
     test_datagen = ImageDataGenerator(rescale=1. / 255)
 
-    image_size = (300, 300)
     class_tuple = ['cherry', 'strawberry', 'tomato']
 
     train_generator = train_datagen.flow_from_directory(
         directory='train',
         target_size=image_size,
         classes=class_tuple,
-        batch_size=10)
+        batch_size=batch_size)
 
     validation_generator = test_datagen.flow_from_directory(
         directory='validation',
         target_size=image_size,
         classes=class_tuple,
-        batch_size=10)
+        batch_size=batch_size)
 
-    test_generator = generator.flow_from_directory(
+    test_generator = test_datagen.flow_from_directory(
         directory='test',
         target_size=image_size,
         classes=class_tuple,
-        batch_size=10,
+        batch_size=batch_size,
         shuffle=False)
 
     assert train_generator.n == 3600
@@ -127,7 +129,7 @@ def create_data_generators():
     return train_generator, validation_generator, test_generator
 
 
-def train_model(model, train_generator, validation_generator,):
+def train_model(model, train_generator, validation_generator):
     """
     Train the CNN model
     ***
@@ -137,10 +139,10 @@ def train_model(model, train_generator, validation_generator,):
     :return:model:   the trained CNN model
     """
     model.fit(train_generator,
-              steps_per_epoch=360,
-              epochs=5,
+              steps_per_epoch=3600 // batch_size,
+              epochs=20,
               validation_data=validation_generator,
-              validation_steps=45,
+              validation_steps=450 // batch_size,
               verbose=1)
 
     loss_and_metrics = model.evaluate(test_generator, verbose=0)
