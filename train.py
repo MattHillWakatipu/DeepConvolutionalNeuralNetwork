@@ -114,15 +114,11 @@ def construct_model():
     model.add(Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation='relu'))
     model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
-    # Block 5 convolution layer
-    model.add(Conv2D(filters=512, kernel_size=(3, 3), padding='same', activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
     # Fully connected classifier using softmax
     model.add(Flatten())
-    model.add(Dense(units=256, activation='relu'))
+    model.add(Dense(units=512, activation='relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(units=256, activation='relu'))
+    model.add(Dense(units=512, activation='relu'))
     model.add(Dropout(0.5))
     model.add(Dense(units=3, activation='softmax'))
 
