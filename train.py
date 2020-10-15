@@ -25,9 +25,11 @@ import numpy as np
 import tensorflow as tf
 import random
 
+from tensorflow.python.distribute.multi_process_lib import multiprocessing
 from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten, MaxPool2D
-from tensorflow.python.keras.optimizers import Adam
+from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten, MaxPool2D, \
+    BatchNormalization
+from tensorflow.python.keras.optimizers import Adam, SGD
 
 from test import load_images, convert_img_to_array, preprocess_data
 
@@ -37,7 +39,7 @@ np.random.seed(SEED)
 random.seed(SEED)
 tf.random.set_seed(SEED)
 
-batch_size = 16
+batch_size = 64
 image_size = (300, 300)
 
 
@@ -97,7 +99,7 @@ def construct_model():
 
     # Block 1 convolution layer
     model.add(Conv2D(input_shape=(300, 300, 3), filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
-    # model.add(Conv2D(filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(Conv2D(filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
     model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
     model.add(Conv2D(filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
@@ -107,30 +109,11 @@ def construct_model():
     model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
     model.add(Flatten())
-
+    model.add(Dense(units=64, activation='relu'))
+    model.add(Dropout(0.5))
     model.add(Dense(units=64, activation='relu'))
     model.add(Dropout(0.5))
     model.add(Dense(units=3, activation='softmax'))
-
-    # AlexNet
-    # model.add(Conv2D(input_shape=(300, 300, 3), filters=96, kernel_size=(11, 11), strides=4, activation='relu'))
-    # model.add(MaxPooling2D(pool_size=(3, 3), strides=(2, 2)))
-    #
-    # model.add(Conv2D(filters=256, kernel_size=(5, 5), padding='same', activation='relu'))
-    # model.add(MaxPooling2D(pool_size=(3, 3), strides=(2, 2)))
-    #
-    # model.add(Conv2D(filters=512, kernel_size=(3, 3), padding='same', activation='relu'))
-    # model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-    #
-    # model.add(Conv2D(filters=1024, kernel_size=(3, 3), padding='same', activation='relu'))
-    # model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-    #
-    # model.add(Flatten())
-    # model.add(Dense(units=3072, activation='relu'))
-    # model.add(Dense(units=4096, activation='relu'))
-    # model.add(Dense(units=4096, activation='relu'))
-    # model.add(Dropout(0.5))
-    # model.add(Dense(units=3, activation='softmax'))
 
     model.summary()
 
@@ -152,13 +135,17 @@ def train_model(model, train_generator, validation_generator):
     """
     callbacks = EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=20, verbose=1)
 
+    print(multiprocessing.cpu_count())
+
     model.fit(train_generator,
               steps_per_epoch=3600 // batch_size,
               epochs=100,
               validation_data=validation_generator,
               validation_steps=450 // batch_size,
               callbacks=callbacks,
-              verbose=1)
+              workers=32,
+              max_queue_size=10,
+              verbose=2)
 
     loss_and_metrics = model.evaluate(test_generator, verbose=0)
     print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
