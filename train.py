@@ -246,9 +246,12 @@ if __name__ == '__main__':
     model, history = train_model(model, train_generator, test_generator)
 
     # Test the model
-    model.evaluate(train_generator, verbose=0)
-    model.evaluate(validation_generator, verbose=0)
-    model.evaluate(test_generator, verbose=0)
+    loss_and_metrics = model.evaluate(train_generator, verbose=0)
+    print("Train loss:{}\nTrain accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
+    loss_and_metrics = model.evaluate(validation_generator, verbose=0)
+    print("Validation loss:{}\nValidation accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
+    loss_and_metrics = model.evaluate(test_generator, verbose=0)
+    print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
 
     # Plot training
     # plot_training(history)
