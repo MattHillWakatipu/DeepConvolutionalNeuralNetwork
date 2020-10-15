@@ -26,12 +26,12 @@ import tensorflow as tf
 import random
 
 from tensorflow.python.distribute.multi_process_lib import multiprocessing
+from tensorflow.python.keras.applications.vgg16 import VGG16
 from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten, MaxPool2D, \
-    BatchNormalization
+from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten
 from tensorflow.python.keras.optimizers import Adam, SGD
 
-from test import load_images, convert_img_to_array, preprocess_data
+from test import load_images, convert_img_to_array, preprocess_data, gen_evaluate
 
 # Set random seeds to ensure the reproducible results
 SEED = 309
@@ -102,16 +102,27 @@ def construct_model():
     model.add(Conv2D(filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
     model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
-    model.add(Conv2D(filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
+    # Block 2 convolution layer
     model.add(Conv2D(filters=64, kernel_size=(3, 3), padding='same', activation='relu'))
     model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
+    # Block 3 convolution layer
+    model.add(Conv2D(filters=128, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+    # Block 4 convolution layer
+    model.add(Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+    # Block 5 convolution layer
+    model.add(Conv2D(filters=512, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+    # Fully connected classifier using softmax
     model.add(Flatten())
-    model.add(Dense(units=64, activation='relu'))
+    model.add(Dense(units=256, activation='relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(units=64, activation='relu'))
+    model.add(Dense(units=256, activation='relu'))
     model.add(Dropout(0.5))
     model.add(Dense(units=3, activation='softmax'))
 
@@ -133,23 +144,19 @@ def train_model(model, train_generator, validation_generator):
     :param model: the initial CNN model
     :return:model:   the trained CNN model
     """
-    callbacks = EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=20, verbose=1)
+    callbacks = EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=100, verbose=1)
 
-    print(multiprocessing.cpu_count())
+    history = model.fit(train_generator,
+                        epochs=2000,
+                        steps_per_epoch=3600 // batch_size,
+                        validation_data=validation_generator,
+                        validation_steps=450 // batch_size,
+                        callbacks=callbacks,
+                        workers=multiprocessing.cpu_count(),
+                        max_queue_size=512,
+                        verbose=2)
 
-    model.fit(train_generator,
-              steps_per_epoch=3600 // batch_size,
-              epochs=100,
-              validation_data=validation_generator,
-              validation_steps=450 // batch_size,
-              callbacks=callbacks,
-              workers=32,
-              max_queue_size=10,
-              verbose=2)
-
-    loss_and_metrics = model.evaluate(test_generator, verbose=0)
-    print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
-    return model
+    return model, history
 
 
 def save_model(model):
@@ -216,11 +223,26 @@ def plot_images(images_arr):
     plt.show()
 
 
+def plot_training(training):
+    # FIXME broken
+    print(training)
+    print(training.history)
+    plt.plot(training.history["acc"])
+    plt.plot(training.history['val_acc'])
+    plt.plot(training.history['loss'])
+    plt.plot(training.history['val_loss'])
+    plt.title("model accuracy")
+    plt.ylabel("Accuracy")
+    plt.xlabel("Epoch")
+    plt.legend(["Accuracy", "Validation Accuracy", "loss", "Validation Loss"])
+    plt.show()
+
+
 if __name__ == '__main__':
     # Split the dataset into smaller size, may remove later
     split_data()
 
-    # Create data generators for
+    # Create data generators
     train_generator, validation_generator, test_generator = create_data_generators()
 
     # Plot the first 10 images and print their labels
@@ -228,6 +250,19 @@ if __name__ == '__main__':
     # plot_images(images)
     # print(labels)
 
+    # Construct the model
     model = construct_model()
-    model = train_model(model, train_generator, test_generator)
+
+    # Train the model
+    model, history = train_model(model, train_generator, test_generator)
+
+    # Test the model
+    model.evaluate(train_generator, verbose=0)
+    model.evaluate(validation_generator, verbose=0)
+    model.evaluate(test_generator, verbose=0)
+
+    # Plot training
+    # plot_training(history)
+
+    # Save the model
     save_model(model)
