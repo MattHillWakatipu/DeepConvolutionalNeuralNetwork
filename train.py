@@ -6,27 +6,81 @@ This is just a simple template, you feel free to change it according to your own
 However, you must make sure:
 1. Your own model is saved to the directory "model" and named as "model.h5"
 2. The "test.py" must work properly with your model, this will be used by tutors for marking.
-3. If you have added any extra pre-processing steps, please make sure you also implement them in "test.py" so that they can later be applied to test images.
+3. If you have added any extra pre-processing steps, please make sure you also implement them in "test.py"
+    so that they can later be applied to test images.
 
 ©2018 Created by Yiming Peng and Bing Xue
 """
+import glob
+import os
+import shutil
+
+from keras_preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras import backend as K
 
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import random
 
+from tensorflow.python.distribute.multi_process_lib import multiprocessing
+from tensorflow.python.keras.applications.vgg16 import VGG16
+from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten
+from tensorflow.python.keras.optimizers import Adam, SGD
 
-from test import load_images, convert_img_to_array, preprocess_data, unison_shuffle
+from test import load_images, convert_img_to_array, preprocess_data, gen_evaluate
 
 # Set random seeds to ensure the reproducible results
 SEED = 309
 np.random.seed(SEED)
 random.seed(SEED)
 tf.random.set_seed(SEED)
+
+batch_size = 64
+image_size = (300, 300)
+
+
+def create_data_generators():
+    # generator = ImageDataGenerator(preprocessing_function=tf.keras.applications.vgg16.preprocess_input)
+
+    train_datagen = ImageDataGenerator(
+        rescale=1. / 255,
+        shear_range=0.2,
+        zoom_range=0.2,
+        horizontal_flip=True)
+
+    test_datagen = ImageDataGenerator(rescale=1. / 255)
+
+    class_tuple = ['cherry', 'strawberry', 'tomato']
+
+    train_generator = train_datagen.flow_from_directory(
+        directory='train',
+        target_size=image_size,
+        classes=class_tuple,
+        batch_size=batch_size)
+
+    validation_generator = test_datagen.flow_from_directory(
+        directory='validation',
+        target_size=image_size,
+        classes=class_tuple,
+        batch_size=batch_size)
+
+    test_generator = test_datagen.flow_from_directory(
+        directory='test',
+        target_size=image_size,
+        classes=class_tuple,
+        batch_size=batch_size,
+        shuffle=False)
+
+    assert train_generator.n == 3600
+    assert validation_generator.n == 450
+    assert test_generator.n == 450
+    assert train_generator.num_classes == validation_generator.num_classes == test_generator.num_classes == 3
+
+    return train_generator, validation_generator, test_generator
 
 
 def construct_model():
@@ -43,61 +97,45 @@ def construct_model():
     """
     model = Sequential()
 
-    # 3 Convolutional layers with ReLU activation followed by max-pooling
-    model.add(Conv2D(32, (3, 3), input_shape=(300, 300, 3), activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    # Block 1 convolution layer
+    model.add(Conv2D(input_shape=(300, 300, 3), filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(Conv2D(filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
-    model.add(Conv2D(32, (3, 3), activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    # Block 2 convolution layer
+    model.add(Conv2D(filters=64, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
-    model.add(Conv2D(64, (3, 3), activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
+    # Block 3 convolution layer
+    model.add(Conv2D(filters=128, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
+    # Block 4 convolution layer
+    model.add(Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+    # Block 5 convolution layer
+    model.add(Conv2D(filters=512, kernel_size=(3, 3), padding='same', activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+
+    # Fully connected classifier using softmax
     model.add(Flatten())
-    model.add(Dense(64))
-    model.add(Activation('relu'))
+    model.add(Dense(units=256, activation='relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(3))
-    model.add(Activation('sigmoid'))
+    model.add(Dense(units=256, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(units=3, activation='softmax'))
+
+    model.summary()
 
     model.compile(loss='categorical_crossentropy',
-                  optimizer='sgd',
-                  metrics=['categorical_accuracy'])
-
-    print(model.summary())
+                  optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                  metrics=['accuracy'])
 
     return model
 
 
-def load_training_data():
-    # Test folder
-    train_data_dir = "data/smalltrain"
-
-    # Image size, please define according to your settings when training your model.
-    image_size = (300, 300)
-
-    # Load images
-    images, labels = load_images(train_data_dir, image_size)
-
-    # Shuffle in unison to prevent valuation set being comprised of a single class
-    # images, labels = unison_shuffle(images, labels)
-
-    # Convert images to numpy arrays (images are normalized with constant 255.0), and binarize categorical labels
-    x_train, y_train = convert_img_to_array(images, labels)
-
-    # Preprocess data.
-    x_train = preprocess_data(x_train)
-
-    # Exploratory Data Analysis
-    print("Training data loaded")
-    print("Instances: {}".format(x_train.shape[0]))
-    print("Size: {} x {} x {}".format(x_train.shape[1], x_train.shape[2], x_train.shape[3]))
-    print(y_train[-20:])
-
-    return x_train, y_train
-
-
-def train_model(model):
+def train_model(model, train_generator, validation_generator):
     """
     Train the CNN model
     ***
@@ -106,15 +144,19 @@ def train_model(model):
     :param model: the initial CNN model
     :return:model:   the trained CNN model
     """
-    x_train, y_train = load_training_data()
-    model.fit(x_train, y_train,
-              batch_size=10,
-              epochs=50,
-              # validation_split=0.1,
-              verbose=1)
-    loss_and_metrics = model.evaluate(x_train, y_train, verbose=0)
-    print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
-    return model
+    callbacks = EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=100, verbose=1)
+
+    history = model.fit(train_generator,
+                        epochs=2000,
+                        steps_per_epoch=3600 // batch_size,
+                        validation_data=validation_generator,
+                        validation_steps=450 // batch_size,
+                        callbacks=callbacks,
+                        workers=multiprocessing.cpu_count(),
+                        max_queue_size=512,
+                        verbose=2)
+
+    return model, history
 
 
 def save_model(model):
@@ -123,11 +165,104 @@ def save_model(model):
     :param model: the trained CNN model
     :return:
     """
+    print(os.getcwd())
+    os.chdir('..')
     model.save("model/model.h5")
     print("Model Saved Successfully.")
 
 
+def split_data():
+    """
+    Split the data into training, validation, and testing sets.
+    :return:
+    """
+    os.chdir('data')
+
+    if os.path.isdir('train/cherry') is False:
+        os.makedirs('train/cherry')
+        os.makedirs('train/strawberry')
+        os.makedirs('train/tomato')
+
+        os.makedirs('validation/cherry')
+        os.makedirs('validation/strawberry')
+        os.makedirs('validation/tomato')
+
+        os.makedirs('test/cherry')
+        os.makedirs('test/strawberry')
+        os.makedirs('test/tomato')
+
+        for c in random.sample(glob.glob('cherry*'), 1200):
+            shutil.move(c, 'train/cherry')
+        for c in random.sample(glob.glob('strawberry*'), 1200):
+            shutil.move(c, 'train/strawberry')
+        for c in random.sample(glob.glob('tomato*'), 1200):
+            shutil.move(c, 'train/tomato')
+
+        for c in random.sample(glob.glob('cherry*'), 150):
+            shutil.move(c, 'validation/cherry')
+        for c in random.sample(glob.glob('strawberry*'), 150):
+            shutil.move(c, 'validation/strawberry')
+        for c in random.sample(glob.glob('tomato*'), 150):
+            shutil.move(c, 'validation/tomato')
+
+        for c in random.sample(glob.glob('cherry*'), 150):
+            shutil.move(c, 'test/cherry')
+        for c in random.sample(glob.glob('strawberry*'), 150):
+            shutil.move(c, 'test/strawberry')
+        for c in random.sample(glob.glob('tomato*'), 150):
+            shutil.move(c, 'test/tomato')
+
+
+def plot_images(images_arr):
+    fig, axes = plt.subplots(1, 10, figsize=(20, 20))
+    axes = axes.flatten()
+    for img, ax in zip(images_arr, axes):
+        ax.imshow(img)
+        ax.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_training(training):
+    # FIXME broken
+    print(training)
+    print(training.history)
+    plt.plot(training.history["acc"])
+    plt.plot(training.history['val_acc'])
+    plt.plot(training.history['loss'])
+    plt.plot(training.history['val_loss'])
+    plt.title("model accuracy")
+    plt.ylabel("Accuracy")
+    plt.xlabel("Epoch")
+    plt.legend(["Accuracy", "Validation Accuracy", "loss", "Validation Loss"])
+    plt.show()
+
+
 if __name__ == '__main__':
+    # Split the dataset into smaller size, may remove later
+    split_data()
+
+    # Create data generators
+    train_generator, validation_generator, test_generator = create_data_generators()
+
+    # Plot the first 10 images and print their labels
+    # images, labels = next(train_generator)
+    # plot_images(images)
+    # print(labels)
+
+    # Construct the model
     model = construct_model()
-    model = train_model(model)
+
+    # Train the model
+    model, history = train_model(model, train_generator, test_generator)
+
+    # Test the model
+    model.evaluate(train_generator, verbose=0)
+    model.evaluate(validation_generator, verbose=0)
+    model.evaluate(test_generator, verbose=0)
+
+    # Plot training
+    # plot_training(history)
+
+    # Save the model
     save_model(model)
