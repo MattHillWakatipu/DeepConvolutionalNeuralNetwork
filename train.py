@@ -18,7 +18,6 @@ import shutil
 from keras_preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
-from tensorflow.keras import backend as K
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,12 +25,8 @@ import tensorflow as tf
 import random
 
 from tensorflow.python.distribute.multi_process_lib import multiprocessing
-from tensorflow.python.keras.applications.vgg16 import VGG16
-from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.python.keras.layers import Conv2D, Activation, MaxPooling2D, Dropout, Flatten
-from tensorflow.python.keras.optimizers import Adam, SGD
-
-from test import load_images, convert_img_to_array, preprocess_data, gen_evaluate
+from tensorflow.python.keras.callbacks import EarlyStopping
+from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Dropout, Flatten
 
 # Set random seeds to ensure the reproducible results
 SEED = 309
@@ -44,7 +39,7 @@ image_size = (300, 300)
 
 
 def create_data_generators():
-    # generator = ImageDataGenerator(preprocessing_function=tf.keras.applications.vgg16.preprocess_input)
+    class_tuple = ['cherry', 'strawberry', 'tomato']
 
     train_datagen = ImageDataGenerator(
         rescale=1. / 255,
@@ -53,8 +48,6 @@ def create_data_generators():
         horizontal_flip=True)
 
     test_datagen = ImageDataGenerator(rescale=1. / 255)
-
-    class_tuple = ['cherry', 'strawberry', 'tomato']
 
     train_generator = train_datagen.flow_from_directory(
         directory='train',
@@ -140,10 +133,10 @@ def train_model(model, train_generator, validation_generator):
     :param model: the initial CNN model
     :return:model:   the trained CNN model
     """
-    callbacks = EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=100, verbose=1)
+    callbacks = EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=20, verbose=1)
 
     history = model.fit(train_generator,
-                        epochs=2000,
+                        epochs=200,
                         steps_per_epoch=3600 // batch_size,
                         validation_data=validation_generator,
                         validation_steps=450 // batch_size,
