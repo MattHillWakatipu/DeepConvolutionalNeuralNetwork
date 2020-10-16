@@ -39,7 +39,7 @@ def construct_model():
     :return: model: the initial CNN model
     """
     model = Sequential()
-    model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(64, 64, 3)))
+    model.add(layers.Conv2D(32, (3, 3), activation='relu', input_shape=(300, 300, 3)))
     model.add(layers.MaxPooling2D((2, 2)))
     model.add(layers.Conv2D(32, (3, 3), activation='relu'))
     model.add(layers.MaxPooling2D((2, 2)))
@@ -77,7 +77,7 @@ def save_model(model):
     #   Please remove the comment to enable model save.
     #   However, it will overwrite the baseline model we provided.
     # ***
-    # model.save("model/model.h5")
+    model.save("model/model.h5")
     print("Model Saved Successfully.")
 
 

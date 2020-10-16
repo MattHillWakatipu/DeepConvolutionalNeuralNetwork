@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 import random
 
-from tensorflow.python.distribute.multi_process_lib import multiprocessing
+# from tensorflow.python.distribute.multi_process_lib import multiprocessing
 from tensorflow.python.keras.callbacks import EarlyStopping
 from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Dropout, Flatten
 
@@ -34,7 +34,7 @@ np.random.seed(SEED)
 random.seed(SEED)
 tf.random.set_seed(SEED)
 
-batch_size = 64
+batch_size = 16
 image_size = (300, 300)
 
 
@@ -141,8 +141,8 @@ def train_model(model, train_generator, validation_generator):
                         validation_data=validation_generator,
                         validation_steps=450 // batch_size,
                         callbacks=callbacks,
-                        workers=multiprocessing.cpu_count(),
-                        max_queue_size=512,
+                        # workers=multiprocessing.cpu_count(),
+                        max_queue_size=16,
                         verbose=2)
 
     return model, history
