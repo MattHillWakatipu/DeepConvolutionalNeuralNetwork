@@ -98,7 +98,7 @@ def evaluate(x_test, y_test):
     batch_size = 16
 
     # Load Model
-    model = load_model('model/smalltrain.h5')
+    model = load_model('model/template.h5')
     print(model.summary())
     return model.evaluate(x_test, y_test, batch_size, verbose=1)
 
@@ -113,7 +113,7 @@ def gen_evaluate(test_generator):
     batch_size = 16
 
     # Load Model
-    model = load_model('model/smalltrain.h5')
+    model = load_model('model/template.h5')
     print(model.summary())
     return model.evaluate(test_generator, batch_size=batch_size, verbose=0)
 

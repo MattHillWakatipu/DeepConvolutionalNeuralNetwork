@@ -90,25 +90,25 @@ def construct_model():
     """
     model = Sequential()
 
-    # Block 1 convolution layer
-    model.add(Conv2D(input_shape=(300, 300, 3), filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
-    model.add(Conv2D(filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
-    # Block 2 convolution layer
-    model.add(Conv2D(filters=64, kernel_size=(3, 3), padding='same', activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
-    # Block 3 convolution layer
-    model.add(Conv2D(filters=128, kernel_size=(3, 3), padding='same', activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-
-    # Block 4 convolution layer
-    model.add(Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation='relu'))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+    # # Block 1 convolution layer
+    # model.add(Conv2D(input_shape=(300, 300, 3), filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
+    # model.add(Conv2D(filters=32, kernel_size=(3, 3), padding='same', activation='relu'))
+    # model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+    #
+    # # Block 2 convolution layer
+    # model.add(Conv2D(filters=64, kernel_size=(3, 3), padding='same', activation='relu'))
+    # model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+    #
+    # # Block 3 convolution layer
+    # model.add(Conv2D(filters=128, kernel_size=(3, 3), padding='same', activation='relu'))
+    # model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+    #
+    # # Block 4 convolution layer
+    # model.add(Conv2D(filters=256, kernel_size=(3, 3), padding='same', activation='relu'))
+    # model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
 
     # Fully connected classifier using softmax
-    model.add(Flatten())
+    # model.add(Flatten())
     model.add(Dense(units=512, activation='relu'))
     model.add(Dropout(0.5))
     model.add(Dense(units=512, activation='relu'))

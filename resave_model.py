@@ -63,7 +63,15 @@ def train_model(model):
     :param model: the initial CNN model
     :return:model:   the trained CNN model
     """
-    # Add your code here
+    model.fit(train_generator,
+              epochs=5,
+              steps_per_epoch=50,
+              validation_data=validation_generator,
+              validation_steps=450 // batch_size,
+              callbacks=callbacks,
+              # workers=multiprocessing.cpu_count(),
+              max_queue_size=16,
+              verbose=2)
     return model
 
 
