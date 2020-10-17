@@ -24,14 +24,17 @@ import numpy as np
 import tensorflow as tf
 import random
 
+from keras import backend as k
 from tensorflow.python.distribute.multi_process_lib import multiprocessing
-from tensorflow.python.keras.callbacks import EarlyStopping
+from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Dropout, Flatten
 
 # Set random seeds to ensure the reproducible results
+from tensorflow.python.keras.metrics import AUC, Precision, Recall, Accuracy, CategoricalAccuracy
+
 SEED = 309
-np.random.seed(SEED)
 random.seed(SEED)
+np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
 batch_size = 64
@@ -50,19 +53,19 @@ def create_data_generators():
     test_datagen = ImageDataGenerator(rescale=1. / 255)
 
     train_generator = train_datagen.flow_from_directory(
-        directory='train',
+        directory='data/train',
         target_size=image_size,
         classes=class_tuple,
         batch_size=batch_size)
 
     validation_generator = test_datagen.flow_from_directory(
-        directory='validation',
+        directory='data/validation',
         target_size=image_size,
         classes=class_tuple,
         batch_size=batch_size)
 
     test_generator = test_datagen.flow_from_directory(
-        directory='test',
+        directory='data/test',
         target_size=image_size,
         classes=class_tuple,
         batch_size=batch_size,
@@ -133,7 +136,11 @@ def train_model(model, train_generator, validation_generator):
     :param model: the initial CNN model
     :return:model:   the trained CNN model
     """
-    callbacks = EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=20, verbose=1)
+    callbacks = [
+        EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=20, verbose=1),
+        ModelCheckpoint(filepath='./model/checkpoints/model.{epoch:02d}-{val_loss:.2f}.h5', save_best_only=True),
+        # TensorBoard(log_dir='./logs')
+    ]
 
     history = model.fit(train_generator,
                         epochs=200,
@@ -154,8 +161,6 @@ def save_model(model):
     :param model: the trained CNN model
     :return:
     """
-    print(os.getcwd())
-    os.chdir('..')
     model.save("model/model.h5")
     print("Model Saved Successfully.")
 
@@ -165,9 +170,9 @@ def split_data():
     Split the data into training, validation, and testing sets.
     :return:
     """
-    os.chdir('data')
+    if os.path.isdir('data/train/cherry') is False:
+        os.chdir('data')
 
-    if os.path.isdir('train/cherry') is False:
         os.makedirs('train/cherry')
         os.makedirs('train/strawberry')
         os.makedirs('train/tomato')
@@ -200,6 +205,8 @@ def split_data():
             shutil.move(c, 'test/strawberry')
         for c in random.sample(glob.glob('tomato*'), 150):
             shutil.move(c, 'test/tomato')
+
+        os.chdir('..')
 
 
 def plot_images(images_arr):
@@ -246,12 +253,13 @@ if __name__ == '__main__':
     model, history = train_model(model, train_generator, test_generator)
 
     # Test the model
+    print("Testing model...")
     loss_and_metrics = model.evaluate(train_generator, verbose=0)
-    print("Train loss:{}\nTrain accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
+    print("Train loss:{}\nTrain accuracy:{}\n".format(loss_and_metrics[0], loss_and_metrics[1]))
     loss_and_metrics = model.evaluate(validation_generator, verbose=0)
-    print("Validation loss:{}\nValidation accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
+    print("Validation loss:{}\nValidation accuracy:{}\n".format(loss_and_metrics[0], loss_and_metrics[1]))
     loss_and_metrics = model.evaluate(test_generator, verbose=0)
-    print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
+    print("Test loss:{}\nTest accuracy:{}\n".format(loss_and_metrics[0], loss_and_metrics[1]))
 
     # Plot training
     # plot_training(history)
