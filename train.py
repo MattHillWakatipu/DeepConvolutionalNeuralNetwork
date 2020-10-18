@@ -24,13 +24,12 @@ import numpy as np
 import tensorflow as tf
 import random
 
-from keras import backend as k
 from tensorflow.python.distribute.multi_process_lib import multiprocessing
 from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Dropout, Flatten
 
 # Set random seeds to ensure the reproducible results
-from tensorflow.python.keras.metrics import AUC, Precision, Recall, Accuracy, CategoricalAccuracy
+from tensorflow.python.keras.regularizers import L1L2
 
 SEED = 309
 random.seed(SEED)
@@ -73,7 +72,7 @@ def create_data_generators():
 
     assert train_generator.n == 3600
     assert validation_generator.n == 450
-    assert test_generator.n == 450
+    assert test_generator.n == 150
     assert train_generator.num_classes == validation_generator.num_classes == test_generator.num_classes == 3
 
     return train_generator, validation_generator, test_generator
@@ -112,9 +111,9 @@ def construct_model():
 
     # Fully connected classifier using softmax
     model.add(Flatten())
-    model.add(Dense(units=512, activation='relu'))
+    model.add(Dense(units=1024, activation='relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(units=512, activation='relu'))
+    model.add(Dense(units=1024, activation='relu'))
     model.add(Dropout(0.5))
     model.add(Dense(units=3, activation='softmax'))
 
@@ -170,6 +169,10 @@ def split_data():
     Split the data into training, validation, and testing sets.
     :return:
     """
+    train_size = 1200
+    validation_size = 150
+    test_size = 50
+
     if os.path.isdir('data/train/cherry') is False:
         os.chdir('data')
 
@@ -185,25 +188,25 @@ def split_data():
         os.makedirs('test/strawberry')
         os.makedirs('test/tomato')
 
-        for c in random.sample(glob.glob('cherry*'), 1200):
+        for c in random.sample(glob.glob('cherry*'), train_size):
             shutil.move(c, 'train/cherry')
-        for c in random.sample(glob.glob('strawberry*'), 1200):
+        for c in random.sample(glob.glob('strawberry*'), train_size):
             shutil.move(c, 'train/strawberry')
-        for c in random.sample(glob.glob('tomato*'), 1200):
+        for c in random.sample(glob.glob('tomato*'), train_size):
             shutil.move(c, 'train/tomato')
 
-        for c in random.sample(glob.glob('cherry*'), 150):
+        for c in random.sample(glob.glob('cherry*'), validation_size):
             shutil.move(c, 'validation/cherry')
-        for c in random.sample(glob.glob('strawberry*'), 150):
+        for c in random.sample(glob.glob('strawberry*'), validation_size):
             shutil.move(c, 'validation/strawberry')
-        for c in random.sample(glob.glob('tomato*'), 150):
+        for c in random.sample(glob.glob('tomato*'), validation_size):
             shutil.move(c, 'validation/tomato')
 
-        for c in random.sample(glob.glob('cherry*'), 150):
+        for c in random.sample(glob.glob('cherry*'), test_size):
             shutil.move(c, 'test/cherry')
-        for c in random.sample(glob.glob('strawberry*'), 150):
+        for c in random.sample(glob.glob('strawberry*'), test_size):
             shutil.move(c, 'test/strawberry')
-        for c in random.sample(glob.glob('tomato*'), 150):
+        for c in random.sample(glob.glob('tomato*'), test_size):
             shutil.move(c, 'test/tomato')
 
         os.chdir('..')
