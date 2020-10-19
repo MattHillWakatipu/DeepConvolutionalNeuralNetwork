@@ -19,18 +19,16 @@ from keras_preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import random
 
 from tensorflow.python.distribute.multi_process_lib import multiprocessing
+from tensorflow.python.keras import Input
 from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Dropout, Flatten
 
 # Set random seeds to ensure the reproducible results
-from tensorflow.python.keras.regularizers import L1L2
-
 SEED = 309
 random.seed(SEED)
 np.random.seed(SEED)
@@ -118,6 +116,26 @@ def construct_model():
     model.add(Dense(units=3, activation='softmax'))
 
     model.summary()
+
+    model.compile(loss='categorical_crossentropy',
+                  optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                  metrics=['accuracy'])
+
+    return model
+
+
+def construct_mlp_model():
+    """
+    Construct the MLP model.
+    :return: model: the initial MLP model.
+    """
+    model = Sequential()
+
+    model.add(Input(shape=(300, 300, 3)))
+    model.add(Flatten())
+    model.add(Dense(units=256, activation='relu'))
+    model.add(Dense(units=256, activation='relu'))
+    model.add(Dense(units=3, activation='softmax'))
 
     model.compile(loss='categorical_crossentropy',
                   optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
