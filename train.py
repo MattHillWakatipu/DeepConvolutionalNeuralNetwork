@@ -19,26 +19,33 @@ from keras_preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import random
 
 from tensorflow.python.distribute.multi_process_lib import multiprocessing
-from tensorflow.python.keras.callbacks import EarlyStopping
+from tensorflow.python.keras import Input
+from tensorflow.python.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Dropout, Flatten
 
 # Set random seeds to ensure the reproducible results
 SEED = 309
-np.random.seed(SEED)
 random.seed(SEED)
+np.random.seed(SEED)
 tf.random.set_seed(SEED)
 
 batch_size = 64
 image_size = (300, 300)
+training_size = 3600
+validation_size = 450
+testing_size = 150
 
 
 def create_data_generators():
+    """
+    Create the data generators from file for each of the datasets.
+    :return: Created Data_Generators
+    """
     class_tuple = ['cherry', 'strawberry', 'tomato']
 
     train_datagen = ImageDataGenerator(
@@ -50,27 +57,27 @@ def create_data_generators():
     test_datagen = ImageDataGenerator(rescale=1. / 255)
 
     train_generator = train_datagen.flow_from_directory(
-        directory='train',
+        directory='data/train',
         target_size=image_size,
         classes=class_tuple,
         batch_size=batch_size)
 
     validation_generator = test_datagen.flow_from_directory(
-        directory='validation',
+        directory='data/validation',
         target_size=image_size,
         classes=class_tuple,
         batch_size=batch_size)
 
     test_generator = test_datagen.flow_from_directory(
-        directory='test',
+        directory='data/test',
         target_size=image_size,
         classes=class_tuple,
         batch_size=batch_size,
         shuffle=False)
 
-    assert train_generator.n == 3600
-    assert validation_generator.n == 450
-    assert test_generator.n == 450
+    assert train_generator.n == training_size
+    assert validation_generator.n == validation_size
+    assert test_generator.n == testing_size
     assert train_generator.num_classes == validation_generator.num_classes == test_generator.num_classes == 3
 
     return train_generator, validation_generator, test_generator
@@ -109,13 +116,33 @@ def construct_model():
 
     # Fully connected classifier using softmax
     model.add(Flatten())
-    model.add(Dense(units=512, activation='relu'))
+    model.add(Dense(units=1024, activation='relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(units=512, activation='relu'))
+    model.add(Dense(units=1024, activation='relu'))
     model.add(Dropout(0.5))
     model.add(Dense(units=3, activation='softmax'))
 
     model.summary()
+
+    model.compile(loss='categorical_crossentropy',
+                  optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                  metrics=['accuracy'])
+
+    return model
+
+
+def construct_mlp_model():
+    """
+    Construct the MLP model.
+    :return: model: the initial MLP model.
+    """
+    model = Sequential()
+
+    model.add(Input(shape=(300, 300, 3)))
+    model.add(Flatten())
+    model.add(Dense(units=256, activation='relu'))
+    model.add(Dense(units=256, activation='relu'))
+    model.add(Dense(units=3, activation='softmax'))
 
     model.compile(loss='categorical_crossentropy',
                   optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
@@ -133,19 +160,23 @@ def train_model(model, train_generator, validation_generator):
     :param model: the initial CNN model
     :return:model:   the trained CNN model
     """
-    callbacks = EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=20, verbose=1)
+    callbacks = [
+        EarlyStopping(monitor="val_loss", min_delta=1e-2, patience=10, verbose=1),
+        ModelCheckpoint(filepath='./model/checkpoints/model.{epoch:02d}-{val_loss:.2f}.h5', save_best_only=True),
+        TensorBoard(log_dir='./logs')
+    ]
 
-    history = model.fit(train_generator,
-                        epochs=200,
-                        steps_per_epoch=3600 // batch_size,
-                        validation_data=validation_generator,
-                        validation_steps=450 // batch_size,
-                        callbacks=callbacks,
-                        workers=multiprocessing.cpu_count(),
-                        max_queue_size=512,
-                        verbose=2)
+    model.fit(train_generator,
+              epochs=200,
+              steps_per_epoch=training_size // batch_size,
+              validation_data=validation_generator,
+              validation_steps=validation_size // batch_size,
+              callbacks=callbacks,
+              workers=multiprocessing.cpu_count(),
+              max_queue_size=512,
+              verbose=2)
 
-    return model, history
+    return model
 
 
 def save_model(model):
@@ -154,8 +185,6 @@ def save_model(model):
     :param model: the trained CNN model
     :return:
     """
-    print(os.getcwd())
-    os.chdir('..')
     model.save("model/model.h5")
     print("Model Saved Successfully.")
 
@@ -165,9 +194,13 @@ def split_data():
     Split the data into training, validation, and testing sets.
     :return:
     """
-    os.chdir('data')
+    class_training_size = training_size // 3
+    class_validation_size = validation_size // 3
+    class_testing_size = testing_size // 3
 
-    if os.path.isdir('train/cherry') is False:
+    if os.path.isdir('data/train/cherry') is False:
+        os.chdir('data')
+
         os.makedirs('train/cherry')
         os.makedirs('train/strawberry')
         os.makedirs('train/tomato')
@@ -180,51 +213,38 @@ def split_data():
         os.makedirs('test/strawberry')
         os.makedirs('test/tomato')
 
-        for c in random.sample(glob.glob('cherry*'), 1200):
+        for c in random.sample(glob.glob('cherry*'), class_training_size):
             shutil.move(c, 'train/cherry')
-        for c in random.sample(glob.glob('strawberry*'), 1200):
+        for c in random.sample(glob.glob('strawberry*'), class_training_size):
             shutil.move(c, 'train/strawberry')
-        for c in random.sample(glob.glob('tomato*'), 1200):
+        for c in random.sample(glob.glob('tomato*'), class_training_size):
             shutil.move(c, 'train/tomato')
 
-        for c in random.sample(glob.glob('cherry*'), 150):
+        for c in random.sample(glob.glob('cherry*'), class_validation_size):
             shutil.move(c, 'validation/cherry')
-        for c in random.sample(glob.glob('strawberry*'), 150):
+        for c in random.sample(glob.glob('strawberry*'), class_validation_size):
             shutil.move(c, 'validation/strawberry')
-        for c in random.sample(glob.glob('tomato*'), 150):
+        for c in random.sample(glob.glob('tomato*'), class_validation_size):
             shutil.move(c, 'validation/tomato')
 
-        for c in random.sample(glob.glob('cherry*'), 150):
+        for c in random.sample(glob.glob('cherry*'), class_testing_size):
             shutil.move(c, 'test/cherry')
-        for c in random.sample(glob.glob('strawberry*'), 150):
+        for c in random.sample(glob.glob('strawberry*'), class_testing_size):
             shutil.move(c, 'test/strawberry')
-        for c in random.sample(glob.glob('tomato*'), 150):
+        for c in random.sample(glob.glob('tomato*'), class_testing_size):
             shutil.move(c, 'test/tomato')
 
-
-def plot_images(images_arr):
-    fig, axes = plt.subplots(1, 10, figsize=(20, 20))
-    axes = axes.flatten()
-    for img, ax in zip(images_arr, axes):
-        ax.imshow(img)
-        ax.axis('off')
-    plt.tight_layout()
-    plt.show()
+        os.chdir('..')
 
 
-def plot_training(training):
-    # FIXME broken
-    print(training)
-    print(training.history)
-    plt.plot(training.history["acc"])
-    plt.plot(training.history['val_acc'])
-    plt.plot(training.history['loss'])
-    plt.plot(training.history['val_loss'])
-    plt.title("model accuracy")
-    plt.ylabel("Accuracy")
-    plt.xlabel("Epoch")
-    plt.legend(["Accuracy", "Validation Accuracy", "loss", "Validation Loss"])
-    plt.show()
+def test_model(model):
+    print("Testing model...")
+    loss_and_metrics = model.evaluate(train_generator, verbose=0)
+    print("Train loss:{}\nTrain accuracy:{}\n".format(loss_and_metrics[0], loss_and_metrics[1]))
+    loss_and_metrics = model.evaluate(validation_generator, verbose=0)
+    print("Validation loss:{}\nValidation accuracy:{}\n".format(loss_and_metrics[0], loss_and_metrics[1]))
+    loss_and_metrics = model.evaluate(test_generator, verbose=0)
+    print("Test loss:{}\nTest accuracy:{}\n".format(loss_and_metrics[0], loss_and_metrics[1]))
 
 
 if __name__ == '__main__':
@@ -234,27 +254,14 @@ if __name__ == '__main__':
     # Create data generators
     train_generator, validation_generator, test_generator = create_data_generators()
 
-    # Plot the first 10 images and print their labels
-    # images, labels = next(train_generator)
-    # plot_images(images)
-    # print(labels)
-
     # Construct the model
     model = construct_model()
 
     # Train the model
-    model, history = train_model(model, train_generator, test_generator)
+    model = train_model(model, train_generator, test_generator)
 
     # Test the model
-    loss_and_metrics = model.evaluate(train_generator, verbose=0)
-    print("Train loss:{}\nTrain accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
-    loss_and_metrics = model.evaluate(validation_generator, verbose=0)
-    print("Validation loss:{}\nValidation accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
-    loss_and_metrics = model.evaluate(test_generator, verbose=0)
-    print("Test loss:{}\nTest accuracy:{}".format(loss_and_metrics[0], loss_and_metrics[1]))
-
-    # Plot training
-    # plot_training(history)
+    test_model(model)
 
     # Save the model
     save_model(model)
